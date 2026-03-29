@@ -164,7 +164,7 @@ Represents a spreadsheet formula. Pass as a cell value when writing, and receive
 
 ## Project Status
 
-**v0.2.0** — functional reader and writer with formula support, 24 passing tests, and prebuilt wheels on PyPI. The API may change before 1.0.
+**v0.1.0** — functional reader and writer with formula support, 24 passing tests, and prebuilt wheels on PyPI. The API may change before 1.0.
 
 ## Contributing
 
