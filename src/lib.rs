@@ -252,7 +252,10 @@ impl Formula {
         }
         match (&self.cached_value, &other.cached_value) {
             (None, None) => Ok(true),
-            (Some(a), Some(b)) => Python::with_gil(|py| a.bind(py).eq(b.bind(py))),
+            (Some(a), Some(b)) => {
+                Python::try_attach(|py| a.bind(py).eq(b.bind(py)))
+                    .unwrap_or(Ok(false))
+            }
             _ => Ok(false),
         }
     }
