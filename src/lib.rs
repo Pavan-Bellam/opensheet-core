@@ -147,6 +147,7 @@ fn version() -> &'static str {
 /// Each sheet is a dict with:
 ///   - "name": sheet name (str)
 ///   - "rows": list of lists of cell values
+///   - "merges": list of merged cell range strings (e.g. ["A1:B2"])
 #[pyfunction]
 fn read_xlsx(py: Python<'_>, path: &str) -> PyResult<Py<PyAny>> {
     let file = File::open(path)
@@ -159,6 +160,8 @@ fn read_xlsx(py: Python<'_>, path: &str) -> PyResult<Py<PyAny>> {
         let dict = PyDict::new(py);
         dict.set_item("name", &sheet.name)?;
         dict.set_item("rows", rows_to_py(py, &sheet.rows)?)?;
+        let merges_list = PyList::new(py, &sheet.merges)?;
+        dict.set_item("merges", merges_list)?;
         result.append(dict)?;
     }
 
@@ -287,6 +290,16 @@ impl XlsxWriter {
             .as_mut()
             .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Writer is already closed"))?;
         w.add_sheet(name)?;
+        Ok(())
+    }
+
+    /// Merge a range of cells (e.g. "A1:B2").
+    fn merge_cells(&mut self, range: &str) -> PyResult<()> {
+        let w = self
+            .inner
+            .as_mut()
+            .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Writer is already closed"))?;
+        w.merge_cells(range)?;
         Ok(())
     }
 

@@ -251,3 +251,70 @@ def test_date_read_openpyxl(tmp_xlsx):
     # openpyxl stores dates with format codes that our reader should detect
     assert rows[1][0] == datetime.date(2025, 1, 1) or rows[1][0] == datetime.datetime(2025, 1, 1, 0, 0, 0)
     assert rows[1][1] == datetime.datetime(2025, 6, 15, 10, 30, 0)
+
+
+def test_merge_cells_write_and_read(tmp_xlsx):
+    """Write merged cells and verify they round-trip."""
+    with opensheet_core.XlsxWriter(tmp_xlsx) as w:
+        w.add_sheet("Merged")
+        w.write_row(["Title spanning columns", "", ""])
+        w.write_row(["A", "B", "C"])
+        w.merge_cells("A1:C1")
+
+    sheets = opensheet_core.read_xlsx(tmp_xlsx)
+    assert sheets[0]["merges"] == ["A1:C1"]
+    assert sheets[0]["rows"][0][0] == "Title spanning columns"
+
+
+def test_multiple_merge_ranges(tmp_xlsx):
+    """Write multiple merge ranges on one sheet."""
+    with opensheet_core.XlsxWriter(tmp_xlsx) as w:
+        w.add_sheet("Multi")
+        w.write_row(["Header", "", "Another", ""])
+        w.write_row([1, 2, 3, 4])
+        w.merge_cells("A1:B1")
+        w.merge_cells("C1:D1")
+
+    sheets = opensheet_core.read_xlsx(tmp_xlsx)
+    assert sorted(sheets[0]["merges"]) == ["A1:B1", "C1:D1"]
+
+
+def test_merge_cells_multi_sheet(tmp_xlsx):
+    """Merge cells on different sheets."""
+    with opensheet_core.XlsxWriter(tmp_xlsx) as w:
+        w.add_sheet("Sheet1")
+        w.write_row(["Merged", ""])
+        w.merge_cells("A1:B1")
+        w.add_sheet("Sheet2")
+        w.write_row(["Also merged", "", ""])
+        w.merge_cells("A1:C1")
+
+    sheets = opensheet_core.read_xlsx(tmp_xlsx)
+    assert sheets[0]["merges"] == ["A1:B1"]
+    assert sheets[1]["merges"] == ["A1:C1"]
+
+
+def test_no_merges(tmp_xlsx):
+    """Sheets without merges return empty list."""
+    with opensheet_core.XlsxWriter(tmp_xlsx) as w:
+        w.add_sheet("Plain")
+        w.write_row(["no", "merges"])
+
+    sheets = opensheet_core.read_xlsx(tmp_xlsx)
+    assert sheets[0]["merges"] == []
+
+
+def test_merge_cells_openpyxl_interop(tmp_xlsx):
+    """Write merges with openpyxl, read with opensheet_core."""
+    openpyxl = pytest.importorskip("openpyxl")
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Merged"
+    ws.append(["Title", None, None])
+    ws.append([1, 2, 3])
+    ws.merge_cells("A1:C1")
+    wb.save(tmp_xlsx)
+
+    sheets = opensheet_core.read_xlsx(tmp_xlsx)
+    assert "A1:C1" in sheets[0]["merges"]

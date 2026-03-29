@@ -33,6 +33,8 @@ pub enum CellValue {
 pub struct Sheet {
     pub name: std::string::String,
     pub rows: Vec<Vec<CellValue>>,
+    /// Merged cell ranges, e.g. ["A1:B2", "C3:D4"].
+    pub merges: Vec<std::string::String>,
 }
 
 /// Convert an Excel serial number to (year, month, day, hour, minute, second, microsecond).

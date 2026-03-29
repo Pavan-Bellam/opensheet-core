@@ -76,10 +76,11 @@ pub fn read_xlsx<R: Read + Seek>(reader: R) -> Result<Vec<Sheet>, XlsxError> {
     // 5. Parse each worksheet
     let mut sheets = Vec::with_capacity(sheet_infos.len());
     for info in &sheet_infos {
-        let rows = parse_worksheet(&mut archive, &info.path, &shared_strings, &date_styles)?;
+        let data = parse_worksheet(&mut archive, &info.path, &shared_strings, &date_styles)?;
         sheets.push(Sheet {
             name: info.name.clone(),
-            rows,
+            rows: data.rows,
+            merges: data.merges,
         });
     }
 
@@ -389,13 +390,19 @@ fn parse_cell_ref(cell_ref: &str) -> (usize, usize) {
     (row.saturating_sub(1), col)
 }
 
-/// Parse a single worksheet XML file and return rows of cell values.
+/// Parsed worksheet data: rows and merge ranges.
+struct WorksheetData {
+    rows: Vec<Vec<CellValue>>,
+    merges: Vec<String>,
+}
+
+/// Parse a single worksheet XML file and return rows of cell values and merge ranges.
 fn parse_worksheet<R: Read + Seek>(
     archive: &mut ZipArchive<R>,
     path: &str,
     shared_strings: &[String],
     date_styles: &[bool],
-) -> Result<Vec<Vec<CellValue>>, XlsxError> {
+) -> Result<WorksheetData, XlsxError> {
     let file = archive.by_name(path)?;
     let mut reader = Reader::from_reader(BufReader::new(file));
     let mut buf = Vec::new();
@@ -411,11 +418,16 @@ fn parse_worksheet<R: Read + Seek>(
     let mut in_inline_str = false;
     let mut cell_value_text = String::new();
     let mut cell_formula_text = String::new();
+    let mut merges: Vec<String> = Vec::new();
+    let mut in_merge_cells = false;
 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) => {
                 match e.name().as_ref() {
+                    b"mergeCells" => {
+                        in_merge_cells = true;
+                    }
                     b"row" => {
                         // Get row number from r attribute
                         for attr in e.attributes().flatten() {
@@ -528,7 +540,17 @@ fn parse_worksheet<R: Read + Seek>(
                     b"is" => {
                         in_inline_str = false;
                     }
+                    b"mergeCells" => {
+                        in_merge_cells = false;
+                    }
                     _ => {}
+                }
+            }
+            Ok(Event::Empty(ref e)) if in_merge_cells && e.name().as_ref() == b"mergeCell" => {
+                for attr in e.attributes().flatten() {
+                    if attr.key.as_ref() == b"ref" {
+                        merges.push(String::from_utf8_lossy(&attr.value).to_string());
+                    }
                 }
             }
             Ok(Event::Text(ref e)) if in_formula => {
@@ -546,7 +568,7 @@ fn parse_worksheet<R: Read + Seek>(
         buf.clear();
     }
 
-    Ok(rows)
+    Ok(WorksheetData { rows, merges })
 }
 
 /// Convert raw cell value text into a typed CellValue based on the cell type attribute.

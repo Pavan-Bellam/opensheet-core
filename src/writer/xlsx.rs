@@ -47,6 +47,11 @@ struct SheetEntry {
     index: usize,
 }
 
+/// Pending merge ranges for the current sheet.
+struct PendingMerges {
+    ranges: Vec<String>,
+}
+
 /// A streaming XLSX writer that writes rows directly to a ZIP archive.
 ///
 /// Uses inline strings instead of a shared string table for true streaming
@@ -58,6 +63,7 @@ pub struct StreamingXlsxWriter<W: Write + Seek> {
     sheet_open: bool,
     has_dates: bool,
     has_datetimes: bool,
+    pending_merges: PendingMerges,
 }
 
 impl<W: Write + Seek> StreamingXlsxWriter<W> {
@@ -70,6 +76,9 @@ impl<W: Write + Seek> StreamingXlsxWriter<W> {
             sheet_open: false,
             has_dates: false,
             has_datetimes: false,
+            pending_merges: PendingMerges {
+                ranges: Vec::new(),
+            },
         }
     }
 
@@ -216,10 +225,35 @@ impl<W: Write + Seek> StreamingXlsxWriter<W> {
         Ok(())
     }
 
+    /// Mark a range of cells as merged (e.g. "A1:B2").
+    pub fn merge_cells(&mut self, range: &str) -> Result<(), XlsxWriteError> {
+        if !self.sheet_open {
+            return Err(XlsxWriteError::InvalidState(
+                "No sheet is open. Call add_sheet() first.".to_string(),
+            ));
+        }
+        self.pending_merges.ranges.push(range.to_string());
+        Ok(())
+    }
+
     /// Close the current sheet's XML.
     fn close_sheet(&mut self) -> Result<(), XlsxWriteError> {
         if self.sheet_open {
-            write!(self.zip()?, "</sheetData></worksheet>")?;
+            write!(self.zip()?, "</sheetData>")?;
+
+            // Write mergeCells if any
+            let merges = std::mem::take(&mut self.pending_merges.ranges);
+            if !merges.is_empty() {
+                let count = merges.len();
+                write!(self.zip()?, "<mergeCells count=\"{count}\">")?;
+                for range in &merges {
+                    let escaped = xml_escape(range);
+                    write!(self.zip()?, "<mergeCell ref=\"{escaped}\"/>")?;
+                }
+                write!(self.zip()?, "</mergeCells>")?;
+            }
+
+            write!(self.zip()?, "</worksheet>")?;
             self.sheet_open = false;
         }
         Ok(())
