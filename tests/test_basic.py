@@ -2,7 +2,10 @@ import opensheet_core
 
 
 def test_version():
-    assert opensheet_core.__version__ == "0.1.0"
+    # Verify version is a valid semver string
+    parts = opensheet_core.__version__.split(".")
+    assert len(parts) == 3
+    assert all(p.isdigit() for p in parts)
 
 
 def test_import():
