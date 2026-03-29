@@ -24,19 +24,28 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install maturin and test deps
-        run: pip install maturin pytest
-
       - name: Build and install
-        run: maturin develop
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate || .venv\Scripts\activate
+          pip install maturin pytest
+          maturin develop
+        shell: bash
 
       - name: Run tests
-        run: pytest tests/ -v
+        run: |
+          . .venv/bin/activate || .venv\Scripts\activate
+          pytest tests/ -v
+        shell: bash
 
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -47,4 +56,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy
-        run: cargo clippy -- -D warnings
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          cargo clippy -- -D warnings
