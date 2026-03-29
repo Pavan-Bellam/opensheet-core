@@ -1,12 +1,14 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyDict, PyNone};
+use pyo3::types::{PyBool, PyFloat, PyInt, PyList, PyDict, PyNone, PyString};
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter};
 
 mod reader;
 mod types;
+mod writer;
 
 use types::CellValue;
+use writer::xlsx::StreamingXlsxWriter;
 
 /// Convert a CellValue to a Python object.
 fn cell_to_py(py: Python<'_>, cell: &CellValue) -> PyResult<Py<PyAny>> {
@@ -35,6 +37,26 @@ fn rows_to_py(py: Python<'_>, rows: &[Vec<CellValue>]) -> PyResult<Py<PyAny>> {
         py_rows.append(py_row)?;
     }
     Ok(py_rows.into_any().unbind())
+}
+
+/// Convert a Python value to a CellValue.
+fn py_to_cell(obj: &Bound<'_, PyAny>) -> CellValue {
+    if obj.is_none() {
+        CellValue::Empty
+    } else if let Ok(b) = obj.cast::<PyBool>() {
+        CellValue::Bool(b.is_true())
+    } else if let Ok(i) = obj.cast::<PyInt>() {
+        match i.extract::<i64>() {
+            Ok(v) => CellValue::Number(v as f64),
+            Err(_) => CellValue::String(i.to_string()),
+        }
+    } else if let Ok(f) = obj.cast::<PyFloat>() {
+        CellValue::Number(f.value())
+    } else if let Ok(s) = obj.cast::<PyString>() {
+        CellValue::String(s.to_string())
+    } else {
+        CellValue::String(obj.to_string())
+    }
 }
 
 /// Returns version information about the native core.
@@ -115,6 +137,79 @@ fn sheet_names(path: &str) -> PyResult<Vec<String>> {
     Ok(sheets.iter().map(|s| s.name.clone()).collect())
 }
 
+/// Streaming XLSX writer.
+///
+/// Usage:
+///     writer = XlsxWriter("output.xlsx")
+///     writer.add_sheet("Sheet1")
+///     writer.write_row(["Name", "Age", "Score"])
+///     writer.write_row(["Alice", 30, 95.5])
+///     writer.close()
+#[pyclass]
+struct XlsxWriter {
+    inner: Option<StreamingXlsxWriter<BufWriter<File>>>,
+}
+
+#[pymethods]
+impl XlsxWriter {
+    #[new]
+    fn new(path: &str) -> PyResult<Self> {
+        let file = File::create(path)
+            .map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("{path}: {e}")))?;
+        let writer = BufWriter::new(file);
+        Ok(XlsxWriter {
+            inner: Some(StreamingXlsxWriter::new(writer)),
+        })
+    }
+
+    /// Add a new sheet to the workbook.
+    fn add_sheet(&mut self, name: &str) -> PyResult<()> {
+        let w = self.inner.as_mut().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Writer is already closed")
+        })?;
+        w.add_sheet(name)?;
+        Ok(())
+    }
+
+    /// Write a row of values to the current sheet.
+    ///
+    /// Values can be: str, int, float, bool, or None.
+    fn write_row(&mut self, row: &Bound<'_, PyList>) -> PyResult<()> {
+        let w = self.inner.as_mut().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Writer is already closed")
+        })?;
+
+        let cells: Vec<CellValue> = row.iter().map(|item| py_to_cell(&item)).collect();
+        w.write_row(&cells)?;
+        Ok(())
+    }
+
+    /// Close the writer and finalize the XLSX file.
+    fn close(&mut self) -> PyResult<()> {
+        let w = self.inner.take().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Writer is already closed")
+        })?;
+        w.close()?;
+        Ok(())
+    }
+
+    fn __enter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+
+    fn __exit__(
+        &mut self,
+        _exc_type: Option<&Bound<'_, PyAny>>,
+        _exc_val: Option<&Bound<'_, PyAny>>,
+        _exc_tb: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<bool> {
+        if self.inner.is_some() {
+            self.close()?;
+        }
+        Ok(false)
+    }
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -122,5 +217,6 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(read_xlsx, m)?)?;
     m.add_function(wrap_pyfunction!(read_sheet, m)?)?;
     m.add_function(wrap_pyfunction!(sheet_names, m)?)?;
+    m.add_class::<XlsxWriter>()?;
     Ok(())
 }
