@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="50%" style="stop-color:#1e293b"/>
+      <stop offset="100%" style="stop-color:#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#38bdf8"/>
+      <stop offset="100%" style="stop-color:#818cf8"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#818cf8"/>
+      <stop offset="100%" style="stop-color:#c084fc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#bg)" rx="12"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.04" stroke="#94a3b8" stroke-width="1">
+    <line x1="0" y1="60" x2="1200" y2="60"/>
+    <line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/>
+    <line x1="0" y1="240" x2="1200" y2="240"/>
+    <line x1="200" y1="0" x2="200" y2="300"/>
+    <line x1="400" y1="0" x2="400" y2="300"/>
+    <line x1="600" y1="0" x2="600" y2="300"/>
+    <line x1="800" y1="0" x2="800" y2="300"/>
+    <line x1="1000" y1="0" x2="1000" y2="300"/>
+  </g>
+
+  <!-- Decorative spreadsheet cells (left side) -->
+  <g opacity="0.08">
+    <rect x="40" y="40" width="80" height="32" rx="4" fill="#38bdf8"/>
+    <rect x="128" y="40" width="80" height="32" rx="4" fill="#818cf8"/>
+    <rect x="216" y="40" width="80" height="32" rx="4" fill="#38bdf8"/>
+    <rect x="40" y="80" width="80" height="32" rx="4" fill="#818cf8"/>
+    <rect x="128" y="80" width="80" height="32" rx="4" fill="#38bdf8"/>
+    <rect x="216" y="80" width="80" height="32" rx="4" fill="#818cf8"/>
+  </g>
+
+  <!-- Decorative spreadsheet cells (right side) -->
+  <g opacity="0.08">
+    <rect x="904" y="188" width="80" height="32" rx="4" fill="#818cf8"/>
+    <rect x="992" y="188" width="80" height="32" rx="4" fill="#38bdf8"/>
+    <rect x="1080" y="188" width="80" height="32" rx="4" fill="#818cf8"/>
+    <rect x="904" y="228" width="80" height="32" rx="4" fill="#38bdf8"/>
+    <rect x="992" y="228" width="80" height="32" rx="4" fill="#818cf8"/>
+    <rect x="1080" y="228" width="80" height="32" rx="4" fill="#38bdf8"/>
+  </g>
+
+  <!-- Streaming arrow (left decorative) -->
+  <g opacity="0.12" transform="translate(60, 180)">
+    <path d="M0 10 L60 10 L50 0 L70 15 L50 30 L60 20 L0 20 Z" fill="url(#accent)"/>
+  </g>
+
+  <!-- Streaming arrow (right decorative) -->
+  <g opacity="0.12" transform="translate(1050, 70)">
+    <path d="M70 10 L10 10 L20 0 L0 15 L20 30 L10 20 L70 20 Z" fill="url(#accent2)"/>
+  </g>
+
+  <!-- Icon: spreadsheet/document -->
+  <g transform="translate(410, 75)">
+    <!-- Doc body -->
+    <rect x="0" y="0" width="48" height="58" rx="6" fill="none" stroke="url(#accent)" stroke-width="2.5"/>
+    <!-- Header row -->
+    <line x1="0" y1="16" x2="48" y2="16" stroke="url(#accent)" stroke-width="2" opacity="0.6"/>
+    <!-- Column divider -->
+    <line x1="20" y1="0" x2="20" y2="58" stroke="url(#accent)" stroke-width="1.5" opacity="0.3"/>
+    <!-- Cell highlights -->
+    <rect x="4" y="4" width="13" height="9" rx="2" fill="url(#accent)" opacity="0.3"/>
+    <rect x="24" y="20" width="20" height="8" rx="2" fill="url(#accent2)" opacity="0.25"/>
+    <rect x="4" y="34" width="13" height="8" rx="2" fill="url(#accent)" opacity="0.2"/>
+    <rect x="24" y="46" width="20" height="8" rx="2" fill="url(#accent2)" opacity="0.2"/>
+    <!-- Streaming indicator -->
+    <path d="M54 20 L68 29 L54 38" fill="none" stroke="url(#accent2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+    <path d="M70 20 L84 29 L70 38" fill="none" stroke="url(#accent2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+  </g>
+
+  <!-- Project name -->
+  <text x="510" y="120" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="52" font-weight="700" fill="#f1f5f9" letter-spacing="-1">
+    OpenSheet Core
+  </text>
+
+  <!-- Tagline -->
+  <text x="510" y="158" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" fill="#94a3b8" font-weight="400">
+    Fast, memory-efficient spreadsheet I/O for Python — powered by Rust
+  </text>
+
+  <!-- Tech pills -->
+  <g transform="translate(510, 180)">
+    <!-- Rust pill -->
+    <rect x="0" y="0" width="72" height="28" rx="14" fill="#38bdf8" opacity="0.15"/>
+    <text x="36" y="19" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" fill="#38bdf8" font-weight="600" text-anchor="middle">Rust</text>
+
+    <!-- Python pill -->
+    <rect x="82" y="0" width="84" height="28" rx="14" fill="#818cf8" opacity="0.15"/>
+    <text x="124" y="19" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" fill="#818cf8" font-weight="600" text-anchor="middle">Python</text>
+
+    <!-- PyO3 pill -->
+    <rect x="176" y="0" width="72" height="28" rx="14" fill="#c084fc" opacity="0.15"/>
+    <text x="212" y="19" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" fill="#c084fc" font-weight="600" text-anchor="middle">PyO3</text>
+
+    <!-- Streaming pill -->
+    <rect x="258" y="0" width="100" height="28" rx="14" fill="#38bdf8" opacity="0.1"/>
+    <text x="308" y="19" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" fill="#64748b" font-weight="500" text-anchor="middle">Streaming</text>
+  </g>
+
+  <!-- Bottom accent line -->
+  <rect x="100" y="288" width="1000" height="2" rx="1" fill="url(#accent)" opacity="0.2"/>
+</svg>
