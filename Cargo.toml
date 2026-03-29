@@ -1,0 +1,13 @@
+[package]
+name = "opensheet-core"
+version = "0.1.0"
+edition = "2021"
+description = "A fast, memory-efficient spreadsheet I/O core"
+license = "MIT"
+
+[lib]
+name = "opensheet_core"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.28", features = ["extension-module"] }
