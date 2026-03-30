@@ -1330,7 +1330,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
 
         assert_eq!(sheets.len(), 1);
         assert_eq!(sheets[0].name, "TestSheet");
@@ -1350,7 +1350,7 @@ mod tests {
 
         // Row 3: bool
         match &sheets[0].rows[2][0] {
-            CellValue::Bool(b) => assert!(*b),
+            CellValue::Bool(b) => assert!(b),
             other => panic!("expected bool, got {other:?}"),
         }
     }
@@ -1375,7 +1375,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         assert_eq!(sheets[0].freeze_pane, Some((1, 0)));
     }
 
@@ -1396,7 +1396,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         assert_eq!(sheets[0].freeze_pane, Some((0, 2)));
     }
 
@@ -1417,7 +1417,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         assert_eq!(sheets[0].freeze_pane, Some((2, 1)));
     }
 
@@ -1437,7 +1437,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         assert_eq!(sheets[0].freeze_pane, None);
     }
 
@@ -1467,7 +1467,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         assert_eq!(sheets[0].auto_filter, Some("A1:B1".to_string()));
     }
 
@@ -1502,7 +1502,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         assert_eq!(sheets.len(), 1);
 
         // Row 2, Col 0: formatted number with currency
@@ -1550,7 +1550,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
 
         match &sheets[0].rows[0][0] {
             CellValue::FormattedNumber { value, format_code } => {
@@ -1584,7 +1584,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         assert_eq!(sheets[0].auto_filter, None);
     }
 
@@ -1610,7 +1610,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         match &sheets[0].rows[0][0] {
             CellValue::StyledCell { value, style } => {
                 match value.as_ref() {
@@ -1645,7 +1645,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         match &sheets[0].rows[0][0] {
             CellValue::StyledCell { value, style } => {
                 match value.as_ref() {
@@ -1684,7 +1684,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         match &sheets[0].rows[0][0] {
             CellValue::StyledCell { value, style } => {
                 match value.as_ref() {
@@ -1724,7 +1724,7 @@ mod tests {
         }
 
         buf.set_position(0);
-        let (sheets, _shared_strings) = read_xlsx(buf).unwrap();
+        let (sheets, _shared_strings, _defined_names) = read_xlsx(buf).unwrap();
         match &sheets[0].rows[0][0] {
             CellValue::StyledCell { value, style } => {
                 match value.as_ref() {
