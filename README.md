@@ -47,14 +47,18 @@ Existing Python spreadsheet libraries force you to choose between performance, m
 
 ## Benchmarks
 
-Benchmarked against [openpyxl](https://openpyxl.readthedocs.io/) 3.1.5 on a 100,000-row x 10-column dataset (1M cells):
+Benchmarked against [openpyxl](https://openpyxl.readthedocs.io/) 3.1.5 on a 100,000-row x 10-column dataset (1M cells), 5 interleaved runs, current RSS measurement (not high-water mark):
 
-| Operation | OpenSheet Core | openpyxl | Speedup | Memory |
-|-----------|---------------|----------|---------|--------|
-| **Write** | 2.3s | 20.8s | **9x faster** | **~300x less** |
-| **Read** | 0.46s | 14.3s | **31x faster** | — |
+| Operation | OpenSheet Core | openpyxl | Speedup | Memory (RSS delta) |
+|-----------|---------------|----------|---------|---------------------|
+| **Write** | 2.3s | 3.7s | **1.6x faster** | **1.7x less** (1.2 MB vs 2.1 MB) |
+| **Read** | 253ms | 3.5s | **13.8x faster** | **2.5x less** (13.5 MB vs 33.3 MB) |
+
+OpenSheet Core is faster and uses less memory for both reads and writes. The speed advantage comes from a Rust streaming parser with deferred shared-string resolution — strings are stored as indices during parsing and only converted to Python objects at the boundary. Write memory is low because the Rust writer streams data directly to disk.
 
 > Run it yourself: `python benchmarks/benchmark.py`
+>
+> See the [Benchmarking Methodology](docs/benchmarking.md) doc for details on how we measure and avoid common benchmarking pitfalls.
 
 ## Installation
 
@@ -305,11 +309,14 @@ OpenSheet Core is designed to be a faster, memory-efficient alternative to openp
 
 | | OpenSheet Core | openpyxl |
 |---|---|---|
-| **Write 1M cells** | ~0.7s | ~1.8s |
-| **Read 1M cells** | ~0.9s | ~2.4s |
-| **Memory usage** | Constant (streaming) | ~50x file size |
+| **Write 1M cells** | ~2.3s | ~3.7s |
+| **Read 1M cells** | ~0.25s | ~3.5s |
+| **Write memory** | 1.2 MB RSS delta | 2.1 MB RSS delta |
+| **Read memory** | 13.5 MB RSS delta | 33.3 MB RSS delta |
 | **Python dependencies** | Zero | Several |
 | **Architecture** | Rust streaming core | Pure Python DOM |
+
+> Memory optimization: shared strings are stored as indices during parsing and resolved to Python objects at the boundary via pre-interned lookup, avoiding duplicate string allocations. A future streaming iterator API will bring constant-memory reads.
 
 ### Feature coverage
 
@@ -361,7 +368,7 @@ OpenSheet Core is designed to be a faster, memory-efficient alternative to openp
 
 ### Our approach
 
-We are not trying to clone openpyxl. We are building a **fast, safe, memory-efficient core** for the most common Excel workflows. The goal is to cover the ~80% of features that people use day-to-day, while being 2–3x faster and using orders of magnitude less memory. Streaming is the default, not an opt-in mode.
+We are not trying to clone openpyxl. We are building a **fast, safe, memory-efficient core** for the most common Excel workflows. The goal is to cover the ~80% of features that people use day-to-day, while being up to 14x faster and using 2–3x less memory. Streaming is the default, not an opt-in mode.
 
 ## Roadmap
 
@@ -418,11 +425,12 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 
 - [ ] Migration guide: openpyxl → opensheet-core (side-by-side code comparisons)
 - [ ] FastAPI/Flask streaming XLSX download examples
+- [x] Benchmark methodology documentation
 - [ ] Dedicated benchmark page with chart visualizations
 
 ## Project Status
 
-**v0.2.0** (in progress) — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, cell styling, and pandas DataFrame support. 135 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
+**v0.2.0** — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, cell styling, and pandas DataFrame support. 135 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
 
 ## Contributing
 

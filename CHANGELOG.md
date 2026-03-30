@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Fix benchmark measurement bias: replace `ru_maxrss` (high-water mark) with current RSS via platform-specific APIs (`proc_pidinfo` on macOS, `/proc/self/statm` on Linux)
+- Interleave benchmark runs (`[A,B,A,B,...]` instead of `[A,A,A,B,B,B]`) to eliminate ordering bias
+- Increase default benchmark runs from 3 to 5 for more stable results
+- Report mean +/- stddev alongside min time and median memory
+- Update README benchmark numbers to reflect accurate, unbiased measurements
+- Add benchmarking methodology documentation (`docs/benchmarking.md`)
+
+### Optimized
+- Reduce read memory usage by ~25% via deferred shared-string resolution: store string indices during parsing, resolve to Python objects at the boundary
+- Pre-intern shared strings as Python objects; repeated strings reuse the same object via `clone_ref()` instead of allocating new copies
+- Convert-and-drop pattern: Rust row data is freed as Python objects are created, avoiding holding both representations simultaneously
+- `read_sheet()` now only parses the requested worksheet instead of all sheets in the workbook
+- `sheet_names()` now only parses `workbook.xml` instead of loading shared strings, styles, and worksheets
+- Read memory improved from 18 MB to 13.5 MB (2.5x less than openpyxl, previously 2.6x more)
+
+## [0.2.0] - 2026-03-30
+
 ### Added
 - Cell styling support: `CellStyle` and `StyledCell` types for fonts (bold, italic, underline, name, size, color), fills (solid color), borders (thin, medium, thick, dashed, dotted, double with per-side control), alignment (horizontal, vertical, wrap text, rotation), and number formats on styled cells
 - Reader returns `StyledCell` for cells with visual styling; plain cells remain unchanged (backward compatible)
@@ -45,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Benchmarks vs openpyxl with runnable benchmark script
 - Zero Python dependencies
 
-[Unreleased]: https://github.com/0xNadr/opensheet-core/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/0xNadr/opensheet-core/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/0xNadr/opensheet-core/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/0xNadr/opensheet-core/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/0xNadr/opensheet-core/releases/tag/v0.1.0

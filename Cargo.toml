@@ -1,6 +1,6 @@
 [package]
 name = "opensheet-core"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "A fast, memory-efficient spreadsheet I/O core"
 license = "MIT"
@@ -17,3 +17,8 @@ extension-module = ["pyo3/extension-module"]
 pyo3 = "0.28"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 quick-xml = "0.37"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

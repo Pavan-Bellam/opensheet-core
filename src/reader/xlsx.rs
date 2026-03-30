@@ -57,8 +57,11 @@ struct SheetInfo {
     path: String,
 }
 
-/// Read an XLSX file and return all sheets.
-pub fn read_xlsx<R: Read + Seek>(reader: R) -> Result<Vec<Sheet>, XlsxError> {
+/// Read an XLSX file and return all sheets plus the shared string table.
+///
+/// Cells referencing shared strings are stored as `CellValue::SharedString(index)`
+/// to avoid cloning. The caller must resolve them using the returned shared strings.
+pub fn read_xlsx<R: Read + Seek>(reader: R) -> Result<(Vec<Sheet>, Vec<String>), XlsxError> {
     let mut archive = ZipArchive::new(reader)?;
 
     // 1. Parse relationships to map rId -> file path
@@ -88,7 +91,62 @@ pub fn read_xlsx<R: Read + Seek>(reader: R) -> Result<Vec<Sheet>, XlsxError> {
         });
     }
 
-    Ok(sheets)
+    Ok((sheets, shared_strings))
+}
+
+/// Read a single sheet by name or index, without parsing other worksheets.
+///
+/// Returns the sheet and the shared string table for resolving SharedString cells.
+pub fn read_single_sheet<R: Read + Seek>(
+    reader: R,
+    sheet_name: Option<&str>,
+    sheet_index: Option<usize>,
+) -> Result<(Sheet, Vec<String>), XlsxError> {
+    let mut archive = ZipArchive::new(reader)?;
+
+    let rels = parse_workbook_rels(&mut archive)?;
+    let sheet_infos = parse_workbook(&mut archive, &rels)?;
+    let shared_strings = parse_shared_strings(&mut archive)?;
+    let styles = parse_styles(&mut archive)?;
+
+    let info = if let Some(name) = sheet_name {
+        sheet_infos
+            .iter()
+            .find(|s| s.name == name)
+            .ok_or_else(|| XlsxError::InvalidStructure(format!("Sheet '{name}' not found")))?
+    } else if let Some(idx) = sheet_index {
+        sheet_infos.get(idx).ok_or_else(|| {
+            XlsxError::InvalidStructure(format!(
+                "Sheet index {idx} out of range (file has {} sheets)",
+                sheet_infos.len()
+            ))
+        })?
+    } else {
+        sheet_infos
+            .first()
+            .ok_or_else(|| XlsxError::InvalidStructure("No sheets found in file".to_string()))?
+    };
+
+    let data = parse_worksheet(&mut archive, &info.path, &shared_strings, &styles)?;
+    let sheet = Sheet {
+        name: info.name.clone(),
+        rows: data.rows,
+        merges: data.merges,
+        column_widths: data.column_widths,
+        row_heights: data.row_heights,
+        freeze_pane: data.freeze_pane,
+        auto_filter: data.auto_filter,
+    };
+
+    Ok((sheet, shared_strings))
+}
+
+/// List sheet names without parsing worksheet data.
+pub fn read_sheet_names<R: Read + Seek>(reader: R) -> Result<Vec<String>, XlsxError> {
+    let mut archive = ZipArchive::new(reader)?;
+    let rels = parse_workbook_rels(&mut archive)?;
+    let sheet_infos = parse_workbook(&mut archive, &rels)?;
+    Ok(sheet_infos.into_iter().map(|s| s.name).collect())
 }
 
 /// Parse xl/_rels/workbook.xml.rels to get rId -> target path mapping.
@@ -414,18 +472,16 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
                             b"numFmtId" => {
-                                num_fmt_id =
-                                    String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                num_fmt_id = parse_u32_from_bytes(&attr.value);
                             }
                             b"fontId" => {
-                                font_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                font_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             b"fillId" => {
-                                fill_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                fill_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             b"borderId" => {
-                                border_id =
-                                    String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                border_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             _ => {}
                         }
@@ -447,7 +503,7 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
                             b"numFmtId" => {
-                                id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                id = parse_u32_from_bytes(&attr.value);
                             }
                             b"formatCode" => {
                                 code = String::from_utf8_lossy(&attr.value).to_string();
@@ -466,7 +522,9 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                 b"sz" if in_font => {
                     for attr in e.attributes().flatten() {
                         if attr.key.as_ref() == b"val" {
-                            current_font.size = String::from_utf8_lossy(&attr.value).parse().ok();
+                            current_font.size = std::str::from_utf8(&attr.value)
+                                .ok()
+                                .and_then(|s| s.parse().ok());
                         }
                     }
                 }
@@ -567,11 +625,12 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                                         Some(String::from_utf8_lossy(&attr.value).to_string());
                                 }
                                 b"wrapText" => {
-                                    align.wrap_text = String::from_utf8_lossy(&attr.value) == "1";
+                                    align.wrap_text = attr.value.as_ref() == b"1";
                                 }
                                 b"textRotation" => {
-                                    align.text_rotation =
-                                        String::from_utf8_lossy(&attr.value).parse().ok();
+                                    align.text_rotation = std::str::from_utf8(&attr.value)
+                                        .ok()
+                                        .and_then(|s| s.parse().ok());
                                 }
                                 _ => {}
                             }
@@ -588,18 +647,16 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
                             b"numFmtId" => {
-                                num_fmt_id =
-                                    String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                num_fmt_id = parse_u32_from_bytes(&attr.value);
                             }
                             b"fontId" => {
-                                font_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                font_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             b"fillId" => {
-                                fill_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                fill_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             b"borderId" => {
-                                border_id =
-                                    String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                border_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             _ => {}
                         }
@@ -859,32 +916,52 @@ fn get_format_code(num_fmt_id: u32, custom_formats: &HashMap<u32, String>) -> Op
     Some(builtin.to_string())
 }
 
-/// Parse a column reference like "A1", "AA5", "BZ100" and return the 0-based column index.
-fn col_to_index(col_ref: &str) -> usize {
-    let mut index: usize = 0;
-    for b in col_ref.bytes() {
-        if b.is_ascii_alphabetic() {
-            index = index * 26 + (b.to_ascii_uppercase() - b'A') as usize + 1;
-        } else {
-            break;
+/// Extract the column index directly from a cell reference byte slice (e.g. b"A1", b"AB12")
+/// without allocating a String.
+fn col_from_cell_ref_bytes(bytes: &[u8]) -> usize {
+    let col_end = bytes
+        .iter()
+        .position(|b| b.is_ascii_digit())
+        .unwrap_or(bytes.len());
+    let mut col: usize = 0;
+    for &b in &bytes[..col_end] {
+        let c = b.to_ascii_uppercase();
+        if c.is_ascii_uppercase() {
+            col = col * 26 + (c - b'A') as usize + 1;
         }
     }
-    if index == 0 {
-        0
-    } else {
-        index - 1
-    }
+    col.saturating_sub(1)
 }
 
-/// Parse a cell reference like "A1" and return (row_0based, col_0based).
-fn parse_cell_ref(cell_ref: &str) -> (usize, usize) {
-    let col_end = cell_ref
-        .bytes()
-        .position(|b| b.is_ascii_digit())
-        .unwrap_or(cell_ref.len());
-    let col = col_to_index(&cell_ref[..col_end]);
-    let row: usize = cell_ref[col_end..].parse().unwrap_or(1);
-    (row.saturating_sub(1), col)
+/// Parse a usize directly from a byte slice without String allocation.
+fn parse_usize_from_bytes(bytes: &[u8]) -> usize {
+    let mut n: usize = 0;
+    for &b in bytes {
+        if b.is_ascii_digit() {
+            n = n * 10 + (b - b'0') as usize;
+        }
+    }
+    n
+}
+
+/// Parse a u32 directly from a byte slice without String allocation.
+fn parse_u32_from_bytes(bytes: &[u8]) -> u32 {
+    let mut n: u32 = 0;
+    for &b in bytes {
+        if b.is_ascii_digit() {
+            n = n * 10 + (b - b'0') as u32;
+        }
+    }
+    n
+}
+
+/// Parse an f64 from a byte slice, falling back to 0.0 on failure.
+fn parse_f64_from_bytes(bytes: &[u8]) -> f64 {
+    // Fast path: try to parse directly from UTF-8 bytes
+    std::str::from_utf8(bytes)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.0)
 }
 
 /// Parsed worksheet data: rows, merge ranges, column widths, row heights, freeze pane, and auto-filter.
@@ -904,11 +981,51 @@ fn parse_worksheet<R: Read + Seek>(
     shared_strings: &[String],
     styles: &[StyleInfo],
 ) -> Result<WorksheetData, XlsxError> {
+    // First pass: quickly scan for <dimension> tag to pre-allocate rows
+    let mut estimated_rows: usize = 0;
+    {
+        let dim_file = archive.by_name(path)?;
+        let mut dim_reader = Reader::from_reader(BufReader::new(dim_file));
+        let mut dim_buf = Vec::new();
+        loop {
+            match dim_reader.read_event_into(&mut dim_buf) {
+                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e))
+                    if e.name().as_ref() == b"dimension" =>
+                {
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"ref" {
+                            // Parse "A1:J100000" -> extract row number after the colon
+                            if let Some(colon_pos) = attr.value.iter().position(|&b| b == b':') {
+                                let after_colon = &attr.value[colon_pos + 1..];
+                                let row_start = after_colon
+                                    .iter()
+                                    .position(|b| b.is_ascii_digit())
+                                    .unwrap_or(0);
+                                estimated_rows = parse_usize_from_bytes(&after_colon[row_start..]);
+                            }
+                        }
+                    }
+                    break;
+                }
+                Ok(Event::Start(ref e)) if e.name().as_ref() == b"sheetData" => break,
+                Ok(Event::Eof) => break,
+                Err(_) => break,
+                _ => {}
+            }
+            dim_buf.clear();
+        }
+    }
+
+    // Main parse
     let file = archive.by_name(path)?;
     let mut reader = Reader::from_reader(BufReader::new(file));
     let mut buf = Vec::new();
 
-    let mut rows: Vec<Vec<CellValue>> = Vec::new();
+    let mut rows: Vec<Vec<CellValue>> = if estimated_rows > 0 {
+        Vec::with_capacity(estimated_rows)
+    } else {
+        Vec::new()
+    };
     let mut current_row: usize = 0;
     let mut current_col: usize = 0;
     let mut cell_type = String::new();
@@ -934,24 +1051,22 @@ fn parse_worksheet<R: Read + Seek>(
                     b"pane" => {
                         let mut y_split: u32 = 0;
                         let mut x_split: u32 = 0;
-                        let mut state = String::new();
+                        let mut is_frozen = false;
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"ySplit" => {
-                                    y_split =
-                                        String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                    y_split = parse_u32_from_bytes(&attr.value);
                                 }
                                 b"xSplit" => {
-                                    x_split =
-                                        String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                    x_split = parse_u32_from_bytes(&attr.value);
                                 }
                                 b"state" => {
-                                    state = String::from_utf8_lossy(&attr.value).to_string();
+                                    is_frozen = attr.value.as_ref() == b"frozen";
                                 }
                                 _ => {}
                             }
                         }
-                        if state == "frozen" && (y_split > 0 || x_split > 0) {
+                        if is_frozen && (y_split > 0 || x_split > 0) {
                             freeze_pane = Some((y_split, x_split));
                         }
                     }
@@ -966,17 +1081,16 @@ fn parse_worksheet<R: Read + Seek>(
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"min" => {
-                                    min = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                    min = parse_u32_from_bytes(&attr.value);
                                 }
                                 b"max" => {
-                                    max = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                    max = parse_u32_from_bytes(&attr.value);
                                 }
                                 b"width" => {
-                                    width =
-                                        String::from_utf8_lossy(&attr.value).parse().unwrap_or(0.0);
+                                    width = parse_f64_from_bytes(&attr.value);
                                 }
                                 b"customWidth" => {
-                                    custom_width = String::from_utf8_lossy(&attr.value) == "1";
+                                    custom_width = attr.value.as_ref() == b"1";
                                 }
                                 _ => {}
                             }
@@ -1005,17 +1119,18 @@ fn parse_worksheet<R: Read + Seek>(
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"r" => {
-                                    let row_num: usize = String::from_utf8_lossy(&attr.value)
-                                        .parse()
-                                        .unwrap_or(current_row + 2);
-                                    current_row = row_num - 1;
+                                    let row_num = parse_usize_from_bytes(&attr.value);
+                                    current_row = if row_num > 0 {
+                                        row_num - 1
+                                    } else {
+                                        current_row + 1
+                                    };
                                 }
                                 b"ht" => {
-                                    height =
-                                        String::from_utf8_lossy(&attr.value).parse().unwrap_or(0.0);
+                                    height = parse_f64_from_bytes(&attr.value);
                                 }
                                 b"customHeight" => {
-                                    custom_height = String::from_utf8_lossy(&attr.value) == "1";
+                                    custom_height = attr.value.as_ref() == b"1";
                                 }
                                 _ => {}
                             }
@@ -1038,16 +1153,20 @@ fn parse_worksheet<R: Read + Seek>(
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"r" => {
-                                    let cell_ref = String::from_utf8_lossy(&attr.value).to_string();
-                                    let (_, col) = parse_cell_ref(&cell_ref);
-                                    current_col = col;
+                                    // Parse column directly from bytes without String allocation
+                                    current_col = col_from_cell_ref_bytes(&attr.value);
                                 }
                                 b"t" => {
-                                    cell_type = String::from_utf8_lossy(&attr.value).to_string();
+                                    // cell_type is only matched against known short ASCII strings,
+                                    // write directly from bytes without Cow/String intermediary
+                                    cell_type.clear();
+                                    if let Ok(s) = std::str::from_utf8(&attr.value) {
+                                        cell_type.push_str(s);
+                                    }
                                 }
                                 b"s" => {
-                                    cell_style =
-                                        String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                                    // Parse integer directly from bytes without String allocation
+                                    cell_style = parse_usize_from_bytes(&attr.value);
                                 }
                                 _ => {}
                             }
@@ -1077,15 +1196,18 @@ fn parse_worksheet<R: Read + Seek>(
                         if in_cell {
                             let style_info = styles.get(cell_style);
                             let is_date = style_info.map(|s| s.is_date).unwrap_or(false);
-                            let format_code = style_info.and_then(|s| s.format_code.clone());
-                            let cell_style_data = style_info.and_then(|s| s.cell_style.clone());
+                            let has_cell_style =
+                                style_info.map(|s| s.cell_style.is_some()).unwrap_or(false);
 
-                            // If style has visual styling, don't pass format_code
-                            // to resolve — it's captured in the CellStyle instead
-                            let resolve_fmt = if cell_style_data.is_some() {
+                            // Only clone format_code/cell_style when actually needed
+                            let resolve_fmt = if has_cell_style {
                                 &None
                             } else {
-                                &format_code
+                                // Borrow instead of clone when possible
+                                match style_info.and_then(|s| s.format_code.as_ref()) {
+                                    Some(_) => &style_info.unwrap().format_code,
+                                    None => &None,
+                                }
                             };
 
                             let value = if !cell_formula_text.is_empty() {
@@ -1116,7 +1238,9 @@ fn parse_worksheet<R: Read + Seek>(
                             };
 
                             // Wrap in StyledCell if there's non-default styling
-                            let final_value = if let Some(style) = cell_style_data {
+                            // Only clone the style here (rare path — most cells have no style)
+                            let final_value = if has_cell_style {
+                                let style = style_info.unwrap().cell_style.clone().unwrap();
                                 CellValue::StyledCell {
                                     value: Box::new(value),
                                     style: Box::new(style),
@@ -1168,22 +1292,22 @@ fn parse_worksheet<R: Read + Seek>(
             Ok(Event::Empty(ref e)) if e.name().as_ref() == b"pane" => {
                 let mut y_split: u32 = 0;
                 let mut x_split: u32 = 0;
-                let mut state = String::new();
+                let mut is_frozen = false;
                 for attr in e.attributes().flatten() {
                     match attr.key.as_ref() {
                         b"ySplit" => {
-                            y_split = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                            y_split = parse_u32_from_bytes(&attr.value);
                         }
                         b"xSplit" => {
-                            x_split = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                            x_split = parse_u32_from_bytes(&attr.value);
                         }
                         b"state" => {
-                            state = String::from_utf8_lossy(&attr.value).to_string();
+                            is_frozen = attr.value.as_ref() == b"frozen";
                         }
                         _ => {}
                     }
                 }
-                if state == "frozen" && (y_split > 0 || x_split > 0) {
+                if is_frozen && (y_split > 0 || x_split > 0) {
                     freeze_pane = Some((y_split, x_split));
                 }
             }
@@ -1195,16 +1319,16 @@ fn parse_worksheet<R: Read + Seek>(
                 for attr in e.attributes().flatten() {
                     match attr.key.as_ref() {
                         b"min" => {
-                            min = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                            min = parse_u32_from_bytes(&attr.value);
                         }
                         b"max" => {
-                            max = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0);
+                            max = parse_u32_from_bytes(&attr.value);
                         }
                         b"width" => {
-                            width = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0.0);
+                            width = parse_f64_from_bytes(&attr.value);
                         }
                         b"customWidth" => {
-                            custom_width = String::from_utf8_lossy(&attr.value) == "1";
+                            custom_width = attr.value.as_ref() == b"1";
                         }
                         _ => {}
                     }
@@ -1260,13 +1384,14 @@ fn resolve_cell_value(
     }
 
     match cell_type {
-        // Shared string
+        // Shared string — store index to avoid cloning; resolved at Python conversion time
         "s" => {
             if let Ok(idx) = raw.parse::<usize>() {
-                shared_strings
-                    .get(idx)
-                    .map(|s| CellValue::String(s.clone()))
-                    .unwrap_or(CellValue::Empty)
+                if idx < shared_strings.len() {
+                    CellValue::SharedString(idx)
+                } else {
+                    CellValue::Empty
+                }
             } else {
                 CellValue::String(raw.to_string())
             }
@@ -1324,20 +1449,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_col_to_index() {
-        assert_eq!(col_to_index("A"), 0);
-        assert_eq!(col_to_index("B"), 1);
-        assert_eq!(col_to_index("Z"), 25);
-        assert_eq!(col_to_index("AA"), 26);
-        assert_eq!(col_to_index("AZ"), 51);
-        assert_eq!(col_to_index("BA"), 52);
+    fn test_col_from_cell_ref_bytes() {
+        assert_eq!(col_from_cell_ref_bytes(b"A1"), 0);
+        assert_eq!(col_from_cell_ref_bytes(b"B1"), 1);
+        assert_eq!(col_from_cell_ref_bytes(b"Z1"), 25);
+        assert_eq!(col_from_cell_ref_bytes(b"AA1"), 26);
+        assert_eq!(col_from_cell_ref_bytes(b"AZ1"), 51);
+        assert_eq!(col_from_cell_ref_bytes(b"BA1"), 52);
     }
 
     #[test]
-    fn test_parse_cell_ref() {
-        assert_eq!(parse_cell_ref("A1"), (0, 0));
-        assert_eq!(parse_cell_ref("B3"), (2, 1));
-        assert_eq!(parse_cell_ref("AA10"), (9, 26));
+    fn test_parse_usize_from_bytes() {
+        assert_eq!(parse_usize_from_bytes(b"0"), 0);
+        assert_eq!(parse_usize_from_bytes(b"1"), 1);
+        assert_eq!(parse_usize_from_bytes(b"42"), 42);
+        assert_eq!(parse_usize_from_bytes(b"100000"), 100000);
     }
 
     #[test]
@@ -1347,8 +1473,8 @@ mod tests {
         let none_fmt = None;
 
         match resolve_cell_value("s", "0", &shared, false, &none_fmt) {
-            CellValue::String(s) => assert_eq!(s, "hello"),
-            _ => panic!("expected string"),
+            CellValue::SharedString(idx) => assert_eq!(shared[idx], "hello"),
+            _ => panic!("expected SharedString"),
         }
 
         match resolve_cell_value("", "42.5", &shared, false, &none_fmt) {
