@@ -37,6 +37,7 @@ Existing Python spreadsheet libraries force you to choose between performance, m
 - **Freeze panes** — freeze rows and/or columns so they stay visible when scrolling
 - **Auto-filter** — add drop-down filter controls to column headers
 - **Number formats** — write and read cells with custom number formats (currency, percentage, custom format strings)
+- **Cell styling** — fonts (bold, italic, underline, name, size, color), fills, borders (thin, medium, thick, dashed, dotted, double), alignment (horizontal, vertical, wrap text, rotation), and number formats on styled cells
 - **Typed cell extraction** — strings, numbers, booleans, dates, datetimes, formulas, and empty cells are returned as native Python types
 - **Context manager support** — Pythonic `with` statement for safe resource management
 - **AI/RAG-ready** — convert spreadsheets to markdown, chunked text, or plain text for LLM pipelines (planned)
@@ -181,6 +182,25 @@ with XlsxWriter("output.xlsx") as writer:
     ])
 ```
 
+### Cell styling
+
+```python
+from opensheet_core import XlsxWriter, CellStyle, StyledCell
+
+with XlsxWriter("output.xlsx") as writer:
+    writer.add_sheet("Report")
+    # Bold header with fill color
+    writer.write_row([
+        StyledCell("Name", CellStyle(bold=True, fill_color="4472C4", font_color="FFFFFF")),
+        StyledCell("Score", CellStyle(bold=True, fill_color="4472C4", font_color="FFFFFF")),
+    ])
+    # Data with borders and alignment
+    writer.write_row([
+        StyledCell("Alice", CellStyle(border="thin", horizontal_alignment="left")),
+        StyledCell(95, CellStyle(border="thin", number_format="0.0")),
+    ])
+```
+
 ### Writing formulas
 
 ```python
@@ -245,6 +265,14 @@ Reads a single XLSX sheet into a pandas DataFrame. Requires `pip install openshe
 
 Writes a pandas DataFrame to an XLSX file. Handles numpy int/float/bool types, `NaN`/`NaT` (written as empty cells), and `datetime64`/`Timestamp` columns. Set `index=True` to include the DataFrame index as column(s).
 
+### `CellStyle(**kwargs)`
+
+Style properties for a cell. All parameters are keyword-only. Properties: `bold` (bool), `italic` (bool), `underline` (bool), `font_name` (str), `font_size` (float), `font_color` (str, hex RGB), `fill_color` (str, hex RGB), `border` (str, shorthand for all 4 sides), `border_left`/`border_right`/`border_top`/`border_bottom` (str: `"thin"`, `"medium"`, `"thick"`, `"dashed"`, `"dotted"`, `"double"`), `border_color` (str, hex RGB), `horizontal_alignment` (str: `"left"`, `"center"`, `"right"`), `vertical_alignment` (str: `"top"`, `"center"`, `"bottom"`), `wrap_text` (bool), `text_rotation` (int, 0-180), `number_format` (str, Excel format code).
+
+### `StyledCell(value, style: CellStyle)`
+
+A cell value with styling. Pass as a cell value in `write_row()`. Returned by `read_xlsx()` and `read_sheet()` for cells that have visual styling. The inner `value` can be a string, number, bool, date, datetime, or formula.
+
 ### `FormattedCell(value, number_format: str)`
 
 A numeric value with a custom Excel number format code. Pass as a cell value in `write_row()`. Returned by `read_xlsx()` for cells with non-default number formats. Common format codes: `"$#,##0.00"` (currency), `"0.00%"` (percentage), `"#,##0"` (thousands separator).
@@ -295,10 +323,10 @@ OpenSheet Core is designed to be a faster, memory-efficient alternative to openp
 | | Formulas with cached values | Yes | Yes |
 | | Rich text | Yes | Planned |
 | | Error values | Yes | Planned |
-| **Styling** | Fonts (name, size, bold, italic, color) | Yes | Planned |
-| | Fill (solid, pattern, gradient) | Yes | Planned |
-| | Borders (14 styles) | Yes | Planned |
-| | Alignment (horizontal, vertical, wrap, rotation) | Yes | Planned |
+| **Styling** | Fonts (name, size, bold, italic, color) | Yes | Yes |
+| | Fill (solid, pattern, gradient) | Yes | Solid |
+| | Borders (14 styles) | Yes | 6 styles |
+| | Alignment (horizontal, vertical, wrap, rotation) | Yes | Yes |
 | | Number formats (30+ builtins + custom) | Yes | Yes |
 | | Named styles | Yes | Planned |
 | | Conditional formatting (6 rule types) | Yes | Planned |
@@ -356,10 +384,7 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 - [x] Auto-filter
 - [x] Number formats (currency, percentage, custom format strings)
 - [x] Pandas DataFrame integration (`read_xlsx_df` / `to_xlsx`)
-
-### Phase 1 — Core usability (next)
-
-- [ ] Basic cell styling (fonts, fills, borders, alignment)
+- [x] Basic cell styling (fonts, fills, borders, alignment)
 
 ### Phase 1.5 — AI/RAG integration
 
@@ -397,7 +422,7 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 
 ## Project Status
 
-**v0.1.1** — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, and pandas DataFrame support. 100 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
+**v0.2.0** (in progress) — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, cell styling, and pandas DataFrame support. 135 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
 
 ## Contributing
 

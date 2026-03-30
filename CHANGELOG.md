@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Cell styling support: `CellStyle` and `StyledCell` types for fonts (bold, italic, underline, name, size, color), fills (solid color), borders (thin, medium, thick, dashed, dotted, double with per-side control), alignment (horizontal, vertical, wrap text, rotation), and number formats on styled cells
+- Reader returns `StyledCell` for cells with visual styling; plain cells remain unchanged (backward compatible)
+- Style deduplication in writer (identical styles share a single XF entry)
+- `border` shorthand parameter on `CellStyle` sets all four sides at once, with per-side overrides
 - Column width support: `set_column_width()` on writer, `"column_widths"` in reader output
 - Row height support: `set_row_height()` on writer, `"row_heights"` in reader output
 - Freeze panes support: `freeze_panes()` on writer, `"freeze_pane"` in reader output
