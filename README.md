@@ -40,7 +40,7 @@ Existing Python spreadsheet libraries force you to choose between performance, m
 - **Cell styling** — fonts (bold, italic, underline, name, size, color), fills, borders (thin, medium, thick, dashed, dotted, double), alignment (horizontal, vertical, wrap text, rotation), and number formats on styled cells
 - **Typed cell extraction** — strings, numbers, booleans, dates, datetimes, formulas, and empty cells are returned as native Python types
 - **Context manager support** — Pythonic `with` statement for safe resource management
-- **AI/RAG-ready** — convert spreadsheets to markdown, chunked text, or plain text for LLM pipelines (planned)
+- **AI/RAG-ready** — convert spreadsheets to markdown tables, embedding-sized chunks, or plain text for LLM and RAG pipelines
 - **Cross-platform** — tested on Linux, macOS, and Windows across Python 3.9–3.13
 - **Pandas integration** — read XLSX files into DataFrames and write DataFrames to XLSX (`pip install opensheet-core[pandas]`)
 - **Zero Python dependencies** — single native extension, no dependency tree to manage
@@ -232,6 +232,51 @@ df = pd.DataFrame({"Name": ["Alice", "Bob"], "Age": [30, 25]})
 to_xlsx(df, "output.xlsx", sheet_name="Results")
 ```
 
+### AI/RAG extraction
+
+```python
+from opensheet_core import xlsx_to_markdown, xlsx_to_text, xlsx_to_chunks
+
+# Convert to a markdown table (great for LLM prompts)
+md = xlsx_to_markdown("data.xlsx")
+
+# Plain text extraction for search indexes
+text = xlsx_to_text("data.xlsx", delimiter="\t")
+
+# Embedding-sized chunks for RAG pipelines (header repeated per chunk)
+chunks = xlsx_to_chunks("data.xlsx", max_rows=50)
+```
+
+### LangChain integration
+
+```python
+from opensheet_core.langchain import OpenSheetLoader
+
+# Markdown mode (default) — one document per file
+loader = OpenSheetLoader("data.xlsx")
+docs = loader.load()
+
+# Chunked mode — multiple documents for RAG
+loader = OpenSheetLoader("data.xlsx", mode="chunks", max_rows=25)
+docs = loader.load()
+```
+
+### LlamaIndex integration
+
+```python
+from opensheet_core.llamaindex import OpenSheetReader
+
+reader = OpenSheetReader()
+docs = reader.load_data("data.xlsx")
+
+# Use with SimpleDirectoryReader
+from llama_index.core import SimpleDirectoryReader
+reader = SimpleDirectoryReader(
+    input_dir="./data",
+    file_extractor={".xlsx": OpenSheetReader()},
+)
+```
+
 ## API Reference
 
 ### `read_xlsx(path: str) -> list[dict]`
@@ -284,6 +329,26 @@ A numeric value with a custom Excel number format code. Pass as a cell value in 
 ### `Formula(formula: str, cached_value=None)`
 
 Represents a spreadsheet formula. Pass as a cell value when writing, and received when reading cells that contain formulas.
+
+### `xlsx_to_markdown(path, sheet_name=None, sheet_index=None, header=True) -> str`
+
+Converts an XLSX file to markdown table(s). When multiple sheets are converted, each table is preceded by a `## Sheet Name` heading. Formulas, `FormattedCell`, and `StyledCell` values are automatically unwrapped to their plain display values.
+
+### `xlsx_to_text(path, sheet_name=None, sheet_index=None, delimiter="\t") -> str`
+
+Converts an XLSX file to plain text with one row per line, cells separated by the delimiter (default: tab). Suitable for search indexes and simple text pipelines.
+
+### `xlsx_to_chunks(path, sheet_name=None, sheet_index=None, max_rows=50, header=True) -> list[str]`
+
+Splits an XLSX file into embedding-sized markdown table chunks. Each chunk contains at most `max_rows` data rows with the header row repeated at the top for self-contained context. Ideal for RAG pipelines.
+
+### `OpenSheetLoader(file_path, mode="markdown", ...)` *(LangChain)*
+
+LangChain document loader. Requires `pip install langchain-core`. Modes: `"markdown"` (default), `"text"`, `"chunks"`. Supports `sheet_name`, `sheet_index`, `header`, `max_rows`, and `delimiter` options. Use `loader.load()` or `loader.lazy_load()`.
+
+### `OpenSheetReader(mode="markdown", ...)` *(LlamaIndex)*
+
+LlamaIndex data reader. Requires `pip install llama-index-core`. Modes: `"markdown"` (default), `"text"`, `"chunks"`. Call `reader.load_data(file_path)` with optional `sheet_name`, `sheet_index`, and `extra_info` arguments. Compatible with `SimpleDirectoryReader` via `file_extractor`.
 
 ## Architecture
 
@@ -358,9 +423,9 @@ OpenSheet Core is designed to be a faster, memory-efficient alternative to openp
 | **VBA/Macros** | Preserve on load (.xlsm) | Yes | Planned |
 | **Integration** | Pandas DataFrame I/O | Yes | Yes |
 | | NumPy type support | Yes | Yes |
-| **AI/RAG** | Markdown/text extraction for LLMs | — | Planned |
-| | Embedding-sized chunking | — | Planned |
-| | LangChain / LlamaIndex loaders | — | Planned |
+| **AI/RAG** | Markdown/text extraction for LLMs | — | Yes |
+| | Embedding-sized chunking | — | Yes |
+| | LangChain / LlamaIndex loaders | — | Yes |
 | **Performance** | Streaming read (constant memory) | Yes (read_only mode) | Yes (default) |
 | | Streaming write (constant memory) | Yes (write_only mode) | Yes (default) |
 
@@ -392,14 +457,11 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 - [x] Number formats (currency, percentage, custom format strings)
 - [x] Pandas DataFrame integration (`read_xlsx_df` / `to_xlsx`)
 - [x] Basic cell styling (fonts, fills, borders, alignment)
-
-### Phase 1.5 — AI/RAG integration
-
-- [ ] `xlsx_to_markdown()` — convert sheets to structured markdown tables for LLM consumption
-- [ ] `xlsx_to_chunks()` — yield embedding-sized chunks with header attachment and merge-aware boundaries
-- [ ] `xlsx_to_text()` — plain text extraction for simple pipelines and search indexes
-- [ ] LangChain `OpenSheetLoader` document loader
-- [ ] LlamaIndex `OpenSheetReader` data connector
+- [x] `xlsx_to_markdown()` — structured markdown tables for LLM consumption
+- [x] `xlsx_to_text()` — plain text extraction for search indexes
+- [x] `xlsx_to_chunks()` — embedding-sized chunks with header attachment
+- [x] LangChain `OpenSheetLoader` document loader
+- [x] LlamaIndex `OpenSheetReader` data connector
 
 ### Phase 2 — Broader compatibility
 
@@ -430,7 +492,7 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 
 ## Project Status
 
-**v0.2.0** — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, cell styling, and pandas DataFrame support. 135 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
+**v0.2.0** — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, cell styling, pandas DataFrame support, and AI/RAG extraction (markdown, text, chunks, LangChain, LlamaIndex). 200 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
 
 ## Contributing
 
