@@ -41,6 +41,7 @@ Existing Python spreadsheet libraries force you to choose between performance, m
 - **Context manager support** — Pythonic `with` statement for safe resource management
 - **AI/RAG-ready** — convert spreadsheets to markdown, chunked text, or plain text for LLM pipelines (planned)
 - **Cross-platform** — tested on Linux, macOS, and Windows across Python 3.9–3.13
+- **Pandas integration** — read XLSX files into DataFrames and write DataFrames to XLSX (`pip install opensheet-core[pandas]`)
 - **Zero Python dependencies** — single native extension, no dependency tree to manage
 
 ## Benchmarks
@@ -58,6 +59,9 @@ Benchmarked against [openpyxl](https://openpyxl.readthedocs.io/) 3.1.5 on a 100,
 
 ```bash
 pip install opensheet-core
+
+# With pandas support
+pip install opensheet-core[pandas]
 ```
 
 ### From source (requires Rust toolchain)
@@ -190,6 +194,20 @@ with XlsxWriter("output.xlsx") as writer:
     writer.write_row(["Total", Formula("SUM(B2:B3)", cached_value=1600)])
 ```
 
+### Pandas integration
+
+```python
+import pandas as pd
+from opensheet_core import read_xlsx_df, to_xlsx
+
+# Read XLSX into a DataFrame
+df = read_xlsx_df("data.xlsx", sheet_name="Sheet1")
+
+# Write a DataFrame to XLSX
+df = pd.DataFrame({"Name": ["Alice", "Bob"], "Age": [30, 25]})
+to_xlsx(df, "output.xlsx", sheet_name="Results")
+```
+
 ## API Reference
 
 ### `read_xlsx(path: str) -> list[dict]`
@@ -218,6 +236,14 @@ Streaming XLSX writer. Use as a context manager.
 | `freeze_panes(row=0, col=0)` | Freeze top `row` rows and left `col` columns |
 | `auto_filter(range)` | Set auto-filter on a range (e.g. `"A1:C1"`) |
 | `close()` | Finalize and close the file |
+
+### `read_xlsx_df(path, sheet_name=None, sheet_index=None, header=True)`
+
+Reads a single XLSX sheet into a pandas DataFrame. Requires `pip install opensheet-core[pandas]`. When `header=True` (default), the first row is used as column names. Formulas are unwrapped to cached values, `FormattedCell` values are unwrapped to plain numbers.
+
+### `to_xlsx(df, path, sheet_name="Sheet1", header=True, index=False)`
+
+Writes a pandas DataFrame to an XLSX file. Handles numpy int/float/bool types, `NaN`/`NaT` (written as empty cells), and `datetime64`/`Timestamp` columns. Set `index=True` to include the DataFrame index as column(s).
 
 ### `FormattedCell(value, number_format: str)`
 
@@ -295,8 +321,8 @@ OpenSheet Core is designed to be a faster, memory-efficient alternative to openp
 | **Tables** | Structured tables with styles | Yes | Planned |
 | **Pivot Tables** | Read/preserve existing | Yes | — |
 | **VBA/Macros** | Preserve on load (.xlsm) | Yes | Planned |
-| **Integration** | Pandas DataFrame I/O | Yes | Planned |
-| | NumPy type support | Yes | Planned |
+| **Integration** | Pandas DataFrame I/O | Yes | Yes |
+| | NumPy type support | Yes | Yes |
 | **AI/RAG** | Markdown/text extraction for LLMs | — | Planned |
 | | Embedding-sized chunking | — | Planned |
 | | LangChain / LlamaIndex loaders | — | Planned |
@@ -329,11 +355,11 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 - [x] Freeze panes
 - [x] Auto-filter
 - [x] Number formats (currency, percentage, custom format strings)
+- [x] Pandas DataFrame integration (`read_xlsx_df` / `to_xlsx`)
 
 ### Phase 1 — Core usability (next)
 
 - [ ] Basic cell styling (fonts, fills, borders, alignment)
-- [ ] Pandas integration (`read_xlsx_df` / `to_xlsx`)
 
 ### Phase 1.5 — AI/RAG integration
 
@@ -371,7 +397,7 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 
 ## Project Status
 
-**v0.1.1** — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, and number format support. 85 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
+**v0.1.1** — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, and pandas DataFrame support. 100 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
 
 ## Contributing
 
