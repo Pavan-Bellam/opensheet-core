@@ -926,7 +926,7 @@ fn col_from_cell_ref_bytes(bytes: &[u8]) -> usize {
     let mut col: usize = 0;
     for &b in &bytes[..col_end] {
         let c = b.to_ascii_uppercase();
-        if (b'A'..=b'Z').contains(&c) {
+        if c.is_ascii_uppercase() {
             col = col * 26 + (c - b'A') as usize + 1;
         }
     }
@@ -937,7 +937,7 @@ fn col_from_cell_ref_bytes(bytes: &[u8]) -> usize {
 fn parse_usize_from_bytes(bytes: &[u8]) -> usize {
     let mut n: usize = 0;
     for &b in bytes {
-        if (b'0'..=b'9').contains(&b) {
+        if b.is_ascii_digit() {
             n = n * 10 + (b - b'0') as usize;
         }
     }
@@ -948,7 +948,7 @@ fn parse_usize_from_bytes(bytes: &[u8]) -> usize {
 fn parse_u32_from_bytes(bytes: &[u8]) -> u32 {
     let mut n: u32 = 0;
     for &b in bytes {
-        if (b'0'..=b'9').contains(&b) {
+        if b.is_ascii_digit() {
             n = n * 10 + (b - b'0') as u32;
         }
     }
