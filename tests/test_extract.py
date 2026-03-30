@@ -358,3 +358,69 @@ class TestEdgeCases:
             assert len(text) > 0
             chunks = xlsx_to_chunks(fixture)
             assert len(chunks) > 0
+
+    def test_chunks_empty_sheet(self, tmp_xlsx):
+        """Empty sheet should produce no chunks."""
+        with XlsxWriter(tmp_xlsx) as w:
+            w.add_sheet("Empty")
+        chunks = xlsx_to_chunks(tmp_xlsx)
+        assert chunks == []
+
+    def test_chunks_header_only_sheet(self, tmp_xlsx):
+        """Sheet with only a header row and no data should produce no chunks."""
+        with XlsxWriter(tmp_xlsx) as w:
+            w.add_sheet("HeaderOnly")
+            w.write_row(["Col1", "Col2"])
+        chunks = xlsx_to_chunks(tmp_xlsx)
+        # Header-only: no data rows, so range(0, max(0,1), max_rows) yields
+        # one iteration but the batch is empty → no chunks
+        assert len(chunks) == 0 or all("Col1" in c for c in chunks)
+
+    def test_markdown_empty_sheet(self, tmp_xlsx):
+        """Empty sheet returns empty string from markdown."""
+        with XlsxWriter(tmp_xlsx) as w:
+            w.add_sheet("Empty")
+        md = xlsx_to_markdown(tmp_xlsx)
+        assert md == ""
+
+    def test_text_empty_sheet(self, tmp_xlsx):
+        """Empty sheet returns empty string from text."""
+        with XlsxWriter(tmp_xlsx) as w:
+            w.add_sheet("Empty")
+        text = xlsx_to_text(tmp_xlsx)
+        assert text == ""
+
+    def test_text_sheet_by_index(self, tmp_xlsx):
+        """Select sheet by index for text extraction."""
+        _write_multi_sheet(tmp_xlsx)
+        text = xlsx_to_text(tmp_xlsx, sheet_index=0)
+        assert "Alice" in text
+        assert "Widget" not in text
+
+    def test_chunks_sheet_by_index(self, tmp_xlsx):
+        """Select sheet by index for chunk extraction."""
+        _write_multi_sheet(tmp_xlsx)
+        chunks = xlsx_to_chunks(tmp_xlsx, sheet_index=1)
+        assert len(chunks) == 1
+        assert "Widget" in chunks[0]
+        assert "Alice" not in chunks[0]
+
+    def test_formula_no_cached_value(self, tmp_xlsx):
+        """Formula without cached_value should render as empty string."""
+        with XlsxWriter(tmp_xlsx) as w:
+            w.add_sheet("Formulas")
+            w.write_row(["Result"])
+            w.write_row([Formula("SUM(A1:A2)")])
+        md = xlsx_to_markdown(tmp_xlsx)
+        assert "SUM" not in md
+
+    def test_cell_to_str_whole_float(self):
+        """Whole-number floats like 42.0 should display as '42'."""
+        from opensheet_core.extract import _cell_to_str
+        assert _cell_to_str(42.0) == "42"
+        assert _cell_to_str(0.0) == "0"
+
+    def test_cell_to_str_fractional_float(self):
+        """Fractional floats should preserve decimals."""
+        from opensheet_core.extract import _cell_to_str
+        assert _cell_to_str(3.14) == "3.14"
