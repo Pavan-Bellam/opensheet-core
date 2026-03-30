@@ -113,9 +113,7 @@ pub fn read_single_sheet<R: Read + Seek>(
         sheet_infos
             .iter()
             .find(|s| s.name == name)
-            .ok_or_else(|| {
-                XlsxError::InvalidStructure(format!("Sheet '{name}' not found"))
-            })?
+            .ok_or_else(|| XlsxError::InvalidStructure(format!("Sheet '{name}' not found")))?
     } else if let Some(idx) = sheet_index {
         sheet_infos.get(idx).ok_or_else(|| {
             XlsxError::InvalidStructure(format!(
@@ -124,9 +122,9 @@ pub fn read_single_sheet<R: Read + Seek>(
             ))
         })?
     } else {
-        sheet_infos.first().ok_or_else(|| {
-            XlsxError::InvalidStructure("No sheets found in file".to_string())
-        })?
+        sheet_infos
+            .first()
+            .ok_or_else(|| XlsxError::InvalidStructure("No sheets found in file".to_string()))?
     };
 
     let data = parse_worksheet(&mut archive, &info.path, &shared_strings, &styles)?;
@@ -474,8 +472,7 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
                             b"numFmtId" => {
-                                num_fmt_id =
-                                    parse_u32_from_bytes(&attr.value);
+                                num_fmt_id = parse_u32_from_bytes(&attr.value);
                             }
                             b"fontId" => {
                                 font_id = parse_u32_from_bytes(&attr.value) as usize;
@@ -484,8 +481,7 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                                 fill_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             b"borderId" => {
-                                border_id =
-                                    parse_u32_from_bytes(&attr.value) as usize;
+                                border_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             _ => {}
                         }
@@ -526,7 +522,9 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                 b"sz" if in_font => {
                     for attr in e.attributes().flatten() {
                         if attr.key.as_ref() == b"val" {
-                            current_font.size = std::str::from_utf8(&attr.value).ok().and_then(|s| s.parse().ok());
+                            current_font.size = std::str::from_utf8(&attr.value)
+                                .ok()
+                                .and_then(|s| s.parse().ok());
                         }
                     }
                 }
@@ -630,8 +628,9 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                                     align.wrap_text = attr.value.as_ref() == b"1";
                                 }
                                 b"textRotation" => {
-                                    align.text_rotation =
-                                        std::str::from_utf8(&attr.value).ok().and_then(|s| s.parse().ok());
+                                    align.text_rotation = std::str::from_utf8(&attr.value)
+                                        .ok()
+                                        .and_then(|s| s.parse().ok());
                                 }
                                 _ => {}
                             }
@@ -648,8 +647,7 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
                             b"numFmtId" => {
-                                num_fmt_id =
-                                    parse_u32_from_bytes(&attr.value);
+                                num_fmt_id = parse_u32_from_bytes(&attr.value);
                             }
                             b"fontId" => {
                                 font_id = parse_u32_from_bytes(&attr.value) as usize;
@@ -658,8 +656,7 @@ fn parse_styles<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<Style
                                 fill_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             b"borderId" => {
-                                border_id =
-                                    parse_u32_from_bytes(&attr.value) as usize;
+                                border_id = parse_u32_from_bytes(&attr.value) as usize;
                             }
                             _ => {}
                         }
@@ -922,7 +919,10 @@ fn get_format_code(num_fmt_id: u32, custom_formats: &HashMap<u32, String>) -> Op
 /// Extract the column index directly from a cell reference byte slice (e.g. b"A1", b"AB12")
 /// without allocating a String.
 fn col_from_cell_ref_bytes(bytes: &[u8]) -> usize {
-    let col_end = bytes.iter().position(|b| b.is_ascii_digit()).unwrap_or(bytes.len());
+    let col_end = bytes
+        .iter()
+        .position(|b| b.is_ascii_digit())
+        .unwrap_or(bytes.len());
     let mut col: usize = 0;
     for &b in &bytes[..col_end] {
         let c = b.to_ascii_uppercase();
@@ -997,7 +997,10 @@ fn parse_worksheet<R: Read + Seek>(
                             // Parse "A1:J100000" -> extract row number after the colon
                             if let Some(colon_pos) = attr.value.iter().position(|&b| b == b':') {
                                 let after_colon = &attr.value[colon_pos + 1..];
-                                let row_start = after_colon.iter().position(|b| b.is_ascii_digit()).unwrap_or(0);
+                                let row_start = after_colon
+                                    .iter()
+                                    .position(|b| b.is_ascii_digit())
+                                    .unwrap_or(0);
                                 estimated_rows = parse_usize_from_bytes(&after_colon[row_start..]);
                             }
                         }
@@ -1117,7 +1120,11 @@ fn parse_worksheet<R: Read + Seek>(
                             match attr.key.as_ref() {
                                 b"r" => {
                                     let row_num = parse_usize_from_bytes(&attr.value);
-                                    current_row = if row_num > 0 { row_num - 1 } else { current_row + 1 };
+                                    current_row = if row_num > 0 {
+                                        row_num - 1
+                                    } else {
+                                        current_row + 1
+                                    };
                                 }
                                 b"ht" => {
                                     height = parse_f64_from_bytes(&attr.value);
@@ -1189,7 +1196,8 @@ fn parse_worksheet<R: Read + Seek>(
                         if in_cell {
                             let style_info = styles.get(cell_style);
                             let is_date = style_info.map(|s| s.is_date).unwrap_or(false);
-                            let has_cell_style = style_info.map(|s| s.cell_style.is_some()).unwrap_or(false);
+                            let has_cell_style =
+                                style_info.map(|s| s.cell_style.is_some()).unwrap_or(false);
 
                             // Only clone format_code/cell_style when actually needed
                             let resolve_fmt = if has_cell_style {

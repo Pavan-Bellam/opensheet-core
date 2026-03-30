@@ -191,29 +191,92 @@ impl<W: Write + Seek> StreamingXlsxWriter<W> {
             fonts: vec![FontDef::default()],
             font_index: HashMap::from([(FontDef::default(), 0)]),
             fills: {
-                let f0 = FillDef { pattern_type: "none".to_string(), fg_color: None };
-                let f1 = FillDef { pattern_type: "gray125".to_string(), fg_color: None };
+                let f0 = FillDef {
+                    pattern_type: "none".to_string(),
+                    fg_color: None,
+                };
+                let f1 = FillDef {
+                    pattern_type: "gray125".to_string(),
+                    fg_color: None,
+                };
                 vec![f0, f1]
             },
             fill_index: {
                 let mut m = HashMap::new();
-                m.insert(FillDef { pattern_type: "none".to_string(), fg_color: None }, 0);
-                m.insert(FillDef { pattern_type: "gray125".to_string(), fg_color: None }, 1);
+                m.insert(
+                    FillDef {
+                        pattern_type: "none".to_string(),
+                        fg_color: None,
+                    },
+                    0,
+                );
+                m.insert(
+                    FillDef {
+                        pattern_type: "gray125".to_string(),
+                        fg_color: None,
+                    },
+                    1,
+                );
                 m
             },
             borders: vec![BorderDef::default()],
             border_index: HashMap::from([(BorderDef::default(), 0)]),
             xfs: {
-                let xf0 = XfDef { font_id: 0, fill_id: 0, border_id: 0, num_fmt_id: 0, alignment: None };
-                let xf1 = XfDef { font_id: 0, fill_id: 0, border_id: 0, num_fmt_id: 164, alignment: None };
-                let xf2 = XfDef { font_id: 0, fill_id: 0, border_id: 0, num_fmt_id: 165, alignment: None };
+                let xf0 = XfDef {
+                    font_id: 0,
+                    fill_id: 0,
+                    border_id: 0,
+                    num_fmt_id: 0,
+                    alignment: None,
+                };
+                let xf1 = XfDef {
+                    font_id: 0,
+                    fill_id: 0,
+                    border_id: 0,
+                    num_fmt_id: 164,
+                    alignment: None,
+                };
+                let xf2 = XfDef {
+                    font_id: 0,
+                    fill_id: 0,
+                    border_id: 0,
+                    num_fmt_id: 165,
+                    alignment: None,
+                };
                 vec![xf0, xf1, xf2]
             },
             xf_index: {
                 let mut m = HashMap::new();
-                m.insert(XfDef { font_id: 0, fill_id: 0, border_id: 0, num_fmt_id: 0, alignment: None }, 0);
-                m.insert(XfDef { font_id: 0, fill_id: 0, border_id: 0, num_fmt_id: 164, alignment: None }, 1);
-                m.insert(XfDef { font_id: 0, fill_id: 0, border_id: 0, num_fmt_id: 165, alignment: None }, 2);
+                m.insert(
+                    XfDef {
+                        font_id: 0,
+                        fill_id: 0,
+                        border_id: 0,
+                        num_fmt_id: 0,
+                        alignment: None,
+                    },
+                    0,
+                );
+                m.insert(
+                    XfDef {
+                        font_id: 0,
+                        fill_id: 0,
+                        border_id: 0,
+                        num_fmt_id: 164,
+                        alignment: None,
+                    },
+                    1,
+                );
+                m.insert(
+                    XfDef {
+                        font_id: 0,
+                        fill_id: 0,
+                        border_id: 0,
+                        num_fmt_id: 165,
+                        alignment: None,
+                    },
+                    2,
+                );
                 m
             },
             num_fmts: vec![],
@@ -377,8 +440,7 @@ impl<W: Write + Seek> StreamingXlsxWriter<W> {
                                 style.number_format = Some("yyyy\\-mm\\-dd".to_string());
                             }
                             CellValue::DateTime { .. } => {
-                                style.number_format =
-                                    Some("yyyy\\-mm\\-dd\\ hh:mm:ss".to_string());
+                                style.number_format = Some("yyyy\\-mm\\-dd\\ hh:mm:ss".to_string());
                             }
                             _ => unreachable!(),
                         }
@@ -412,20 +474,26 @@ impl<W: Write + Seek> StreamingXlsxWriter<W> {
                 let escaped = xml_escape(s);
                 let z = self.zip()?;
                 write!(z, "<c r=\"{col}{row}\" t=\"inlineStr\"")?;
-                if let Some(id) = style_id { write!(z, " s=\"{id}\"")?; }
+                if let Some(id) = style_id {
+                    write!(z, " s=\"{id}\"")?;
+                }
                 write!(z, "><is><t>{escaped}</t></is></c>")?;
             }
             CellValue::Number(n) => {
                 let z = self.zip()?;
                 write!(z, "<c r=\"{col}{row}\"")?;
-                if let Some(id) = style_id { write!(z, " s=\"{id}\"")?; }
+                if let Some(id) = style_id {
+                    write!(z, " s=\"{id}\"")?;
+                }
                 write!(z, "><v>{n}</v></c>")?;
             }
             CellValue::Bool(b) => {
                 let val = if *b { "1" } else { "0" };
                 let z = self.zip()?;
                 write!(z, "<c r=\"{col}{row}\" t=\"b\"")?;
-                if let Some(id) = style_id { write!(z, " s=\"{id}\"")?; }
+                if let Some(id) = style_id {
+                    write!(z, " s=\"{id}\"")?;
+                }
                 write!(z, "><v>{val}</v></c>")?;
             }
             CellValue::Formula {
@@ -437,18 +505,24 @@ impl<W: Write + Seek> StreamingXlsxWriter<W> {
                 match cached_value.as_deref() {
                     Some(CellValue::Number(n)) => {
                         write!(z, "<c r=\"{col}{row}\"")?;
-                        if let Some(id) = style_id { write!(z, " s=\"{id}\"")?; }
+                        if let Some(id) = style_id {
+                            write!(z, " s=\"{id}\"")?;
+                        }
                         write!(z, "><f>{escaped_formula}</f><v>{n}</v></c>")?;
                     }
                     Some(CellValue::String(s)) => {
                         let escaped_val = xml_escape(s);
                         write!(z, "<c r=\"{col}{row}\" t=\"str\"")?;
-                        if let Some(id) = style_id { write!(z, " s=\"{id}\"")?; }
+                        if let Some(id) = style_id {
+                            write!(z, " s=\"{id}\"")?;
+                        }
                         write!(z, "><f>{escaped_formula}</f><v>{escaped_val}</v></c>")?;
                     }
                     _ => {
                         write!(z, "<c r=\"{col}{row}\"")?;
-                        if let Some(id) = style_id { write!(z, " s=\"{id}\"")?; }
+                        if let Some(id) = style_id {
+                            write!(z, " s=\"{id}\"")?;
+                        }
                         write!(z, "><f>{escaped_formula}</f></c>")?;
                     }
                 }
@@ -456,20 +530,43 @@ impl<W: Write + Seek> StreamingXlsxWriter<W> {
             CellValue::Date { year, month, day } => {
                 let serial = datetime_to_excel_serial(*year, *month, *day, 0, 0, 0, 0);
                 let sid = style_id.unwrap_or(1);
-                write!(self.zip()?, "<c r=\"{col}{row}\" s=\"{sid}\"><v>{serial}</v></c>")?;
+                write!(
+                    self.zip()?,
+                    "<c r=\"{col}{row}\" s=\"{sid}\"><v>{serial}</v></c>"
+                )?;
                 self.has_dates = true;
             }
             CellValue::DateTime {
-                year, month, day, hour, minute, second, microsecond,
+                year,
+                month,
+                day,
+                hour,
+                minute,
+                second,
+                microsecond,
             } => {
-                let serial = datetime_to_excel_serial(*year, *month, *day, *hour, *minute, *second, *microsecond);
+                let serial = datetime_to_excel_serial(
+                    *year,
+                    *month,
+                    *day,
+                    *hour,
+                    *minute,
+                    *second,
+                    *microsecond,
+                );
                 let sid = style_id.unwrap_or(2);
-                write!(self.zip()?, "<c r=\"{col}{row}\" s=\"{sid}\"><v>{serial}</v></c>")?;
+                write!(
+                    self.zip()?,
+                    "<c r=\"{col}{row}\" s=\"{sid}\"><v>{serial}</v></c>"
+                )?;
                 self.has_datetimes = true;
             }
             CellValue::FormattedNumber { value, format_code } => {
                 let xf_id = style_id.unwrap_or_else(|| self.register_format(format_code));
-                write!(self.zip()?, "<c r=\"{col}{row}\" s=\"{xf_id}\"><v>{value}</v></c>")?;
+                write!(
+                    self.zip()?,
+                    "<c r=\"{col}{row}\" s=\"{xf_id}\"><v>{value}</v></c>"
+                )?;
             }
             CellValue::StyledCell { .. } => {
                 // Should not happen — StyledCell is unwrapped before calling this
@@ -1053,7 +1150,9 @@ fn col_index_to_letter_slow(index: usize) -> &'static str {
 /// Returns a borrowed reference when no escaping is needed (the common case),
 /// avoiding allocation entirely.
 fn xml_escape(s: &str) -> std::borrow::Cow<'_, str> {
-    if s.bytes().all(|b| b != b'&' && b != b'<' && b != b'>' && b != b'"' && b != b'\'') {
+    if s.bytes()
+        .all(|b| b != b'&' && b != b'<' && b != b'>' && b != b'"' && b != b'\'')
+    {
         std::borrow::Cow::Borrowed(s)
     } else {
         let mut result = String::with_capacity(s.len());

@@ -68,8 +68,15 @@ fn cell_to_py(
             microsecond,
         } => {
             let dt = PyDateTime::new(
-                py, year, month as u8, day as u8, hour as u8, minute as u8, second as u8,
-                microsecond, None,
+                py,
+                year,
+                month as u8,
+                day as u8,
+                hour as u8,
+                minute as u8,
+                second as u8,
+                microsecond,
+                None,
             )?;
             Ok(dt.into_any().unbind())
         }
@@ -373,8 +380,7 @@ fn read_sheet(
     let file = File::open(path)
         .map_err(|e| pyo3::exceptions::PyFileNotFoundError::new_err(format!("{path}: {e}")))?;
     let reader = BufReader::new(file);
-    let (sheet, shared_strings) =
-        reader::xlsx::read_single_sheet(reader, sheet_name, sheet_index)?;
+    let (sheet, shared_strings) = reader::xlsx::read_single_sheet(reader, sheet_name, sheet_index)?;
 
     let py_shared = intern_shared_strings(py, &shared_strings);
     drop(shared_strings);
@@ -843,9 +849,7 @@ impl XlsxWriter {
 
         for row_obj in rows.iter() {
             let row_list = row_obj.cast::<PyList>().map_err(|_| {
-                pyo3::exceptions::PyTypeError::new_err(
-                    "Each element of rows must be a list",
-                )
+                pyo3::exceptions::PyTypeError::new_err("Each element of rows must be a list")
             })?;
             let cells: Vec<CellValue> = row_list.iter().map(|item| py_to_cell(&item)).collect();
             w.write_row(&cells)?;
