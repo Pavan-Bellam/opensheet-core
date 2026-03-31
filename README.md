@@ -42,6 +42,12 @@ Existing Python spreadsheet libraries force you to choose between performance, m
 - **Cell styling** — fonts (bold, italic, underline, name, size, color), fills, borders (thin, medium, thick, dashed, dotted, double), alignment (horizontal, vertical, wrap text, rotation), and number formats on styled cells
 - **Typed cell extraction** — strings, numbers, booleans, dates, datetimes, formulas, and empty cells are returned as native Python types
 - **Context manager support** — Pythonic `with` statement for safe resource management
+- **Comments and hyperlinks** — add cell comments with author/text and hyperlinks with optional tooltips; read them back from existing files
+- **Sheet protection** — protect sheets with optional password and 15+ configurable permission flags
+- **Structured tables** — create Excel tables with column definitions, auto-filter, and table styles
+- **Data validation** — add validation rules (list, whole, decimal, date, time, textLength, custom) with input/error messages
+- **.xlsm read support** — read macro-enabled workbooks (macros gracefully ignored)
+- **Document properties** — read and write core (title, author, etc.) and custom document properties
 - **AI/RAG-ready** — convert spreadsheets to markdown tables, embedding-sized chunks, or plain text for LLM and RAG pipelines
 - **Cross-platform** — tested on Linux, macOS, and Windows across Python 3.9–3.13
 - **Pandas integration** — read XLSX files into DataFrames and write DataFrames to XLSX (`pip install opensheet-core[pandas]`)
@@ -226,6 +232,43 @@ for n in names:
     print(f"{n['name']} → {n['value']} (sheet_index={n['sheet_index']})")
 ```
 
+### Comments and hyperlinks
+
+```python
+from opensheet_core import XlsxWriter
+
+with XlsxWriter("output.xlsx") as writer:
+    writer.add_sheet("Data")
+    writer.write_row(["Name", "Website"])
+    writer.write_row(["Alice", "https://example.com"])
+    writer.add_comment("A1", "Admin", "Primary contact")
+    writer.add_hyperlink("B2", "https://example.com", tooltip="Visit site")
+```
+
+### Sheet protection
+
+```python
+from opensheet_core import XlsxWriter
+
+with XlsxWriter("output.xlsx") as writer:
+    writer.add_sheet("Protected")
+    writer.write_row(["Locked data"])
+    writer.protect_sheet(password="secret", sheet=True, sort=True, auto_filter=True)
+```
+
+### Structured tables
+
+```python
+from opensheet_core import XlsxWriter
+
+with XlsxWriter("output.xlsx") as writer:
+    writer.add_sheet("Data")
+    writer.write_row(["Name", "Age", "City"])
+    writer.write_row(["Alice", 30, "NYC"])
+    writer.write_row(["Bob", 25, "LA"])
+    writer.add_table("A1:C3", ["Name", "Age", "City"], name="People", style="TableStyleMedium2")
+```
+
 ### Writing formulas
 
 ```python
@@ -302,7 +345,7 @@ reader = SimpleDirectoryReader(
 
 ### `read_xlsx(path: str) -> list[dict]`
 
-Reads an XLSX file and returns a list of dicts with `"name"` (str), `"rows"` (list of lists), `"merges"` (list of range strings like `"A1:C1"`), `"column_widths"` (dict of 0-based col index to width), `"row_heights"` (dict of 0-based row index to height), `"freeze_pane"` (tuple of `(rows_frozen, cols_frozen)` or `None`), `"auto_filter"` (range string like `"A1:C1"` or `None`), and `"state"` (str: `"visible"`, `"hidden"`, or `"veryHidden"`). Each cell is a typed Python value (`str`, `int`, `float`, `bool`, `datetime.date`, `datetime.datetime`, `Formula`, `FormattedCell`, or `None`).
+Reads an XLSX file and returns a list of dicts with `"name"` (str), `"rows"` (list of lists), `"merges"` (list of range strings like `"A1:C1"`), `"column_widths"` (dict of 0-based col index to width), `"row_heights"` (dict of 0-based row index to height), `"freeze_pane"` (tuple of `(rows_frozen, cols_frozen)` or `None`), `"auto_filter"` (range string like `"A1:C1"` or `None`), `"state"` (str: `"visible"`, `"hidden"`, or `"veryHidden"`), `"comments"` (list of dicts with `"cell"`, `"author"`, `"text"`), `"hyperlinks"` (list of dicts with `"cell"`, `"url"`, `"tooltip"`), `"protection"` (dict of protection settings or `None`), and `"tables"` (list of table definition dicts). Each cell is a typed Python value (`str`, `int`, `float`, `bool`, `datetime.date`, `datetime.datetime`, `Formula`, `FormattedCell`, or `None`).
 
 ### `read_sheet(path, sheet_name=None, sheet_index=None) -> list[list]`
 
@@ -315,6 +358,10 @@ Returns the list of sheet names in a workbook.
 ### `defined_names(path: str) -> list[dict]`
 
 Returns the defined names (named ranges) in a workbook. Each dict has `"name"` (str), `"value"` (str, the cell reference or formula), and `"sheet_index"` (int if sheet-scoped, `None` if workbook-scoped).
+
+### `document_properties(path: str) -> dict`
+
+Returns document properties with `"core"` (dict of title, subject, creator, keywords, description, last_modified_by, category, created, modified) and `"custom"` (list of dicts with `"name"` and `"value"`).
 
 ### `XlsxWriter(path: str)`
 
@@ -331,6 +378,13 @@ Streaming XLSX writer. Use as a context manager.
 | `auto_filter(range)` | Set auto-filter on a range (e.g. `"A1:C1"`) |
 | `set_sheet_state(state)` | Set sheet visibility: `"visible"`, `"hidden"`, or `"veryHidden"` |
 | `define_name(name, value, sheet_index=None)` | Define a named range (workbook-scoped by default, or sheet-scoped) |
+| `add_comment(cell_ref, author, text)` | Add a comment to a cell |
+| `add_hyperlink(cell_ref, url, tooltip=None)` | Add a hyperlink to a cell |
+| `protect_sheet(password=None, ...)` | Protect sheet with optional password and 15+ permission flags |
+| `add_table(reference, columns, name=None, style=None)` | Add a structured table with auto-filter |
+| `add_data_validation(type, sqref, ...)` | Add data validation rules to cell ranges |
+| `set_document_property(key, value)` | Set core document property (title, creator, etc.) |
+| `set_custom_property(name, value)` | Set a custom document property |
 | `close()` | Finalize and close the file |
 
 ### `read_xlsx_df(path, sheet_name=None, sheet_index=None, header=True)`
@@ -415,7 +469,7 @@ OpenSheet Core is designed to be a faster, memory-efficient alternative to openp
 | Category | Feature | openpyxl | OpenSheet Core |
 |----------|---------|:--------:|:--------------:|
 | **Formats** | .xlsx read/write | Yes | Yes |
-| | .xlsm (macro-enabled) | Yes | Planned |
+| | .xlsm (macro-enabled) | Yes | Read |
 | | .xltx/.xltm (templates) | Yes | — |
 | **Cell Types** | Strings, numbers, booleans | Yes | Yes |
 | | Dates and datetimes | Yes | Yes |
@@ -433,21 +487,23 @@ OpenSheet Core is designed to be a faster, memory-efficient alternative to openp
 | | Freeze panes | Yes | Yes |
 | | Auto-filter | Yes | Yes |
 | | Column widths / row heights | Yes | Yes |
-| | Data validation (7 types) | Yes | Planned |
-| | Sheet protection | Yes | Planned |
+| | Comments | Yes | Yes |
+| | Hyperlinks | Yes | Yes |
+| | Data validation (7 types) | Yes | Yes |
+| | Sheet protection | Yes | Yes |
 | | Row/column insert/delete | Yes | — |
 | | Print settings | Yes | Planned |
 | | Row/column grouping | Yes | — |
 | **Workbook** | Named ranges / defined names | Yes | Yes |
-| | Document properties | Yes | Planned |
+| | Document properties | Yes | Yes |
 | | Workbook protection | Yes | — |
 | | Multiple sheet states (hidden, veryHidden) | Yes | Yes |
 | **Charts** | 12+ chart types (bar, line, pie, scatter, etc.) | Yes | Planned |
 | | 3D variants and combined charts | Yes | — |
 | **Images** | Embed PNG/JPEG | Yes | Planned |
-| **Tables** | Structured tables with styles | Yes | Planned |
+| **Tables** | Structured tables with styles | Yes | Yes |
 | **Pivot Tables** | Read/preserve existing | Yes | — |
-| **VBA/Macros** | Preserve on load (.xlsm) | Yes | Planned |
+| **VBA/Macros** | Preserve on load (.xlsm) | Yes | Read |
 | **Integration** | Pandas DataFrame I/O | Yes | Yes |
 | | NumPy type support | Yes | Yes |
 | **AI/RAG** | Markdown/text extraction for LLMs | — | Yes |
@@ -491,26 +547,34 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 - [x] `xlsx_to_chunks()` — embedding-sized chunks with header attachment
 - [x] LangChain `OpenSheetLoader` document loader
 - [x] LlamaIndex `OpenSheetReader` data connector
+- [x] Comments and hyperlinks (read and write)
+- [x] .xlsm read support (macros gracefully ignored)
+- [x] Sheet protection with optional password
+- [x] Structured tables with styles and auto-filter
+- [x] Data validation (7 types with input/error messages)
+- [x] Document and custom properties (read and write)
+- [x] NumPy type support (int64, float64, bool_, etc.)
+- [x] Security hardening (XML bomb prevention, zip limits)
 
-### Phase 2 — Broader compatibility
+### Phase 2 — Broader compatibility (v0.3.0)
 
 - [x] Named ranges / defined names
-- [ ] Data validation
-- [ ] Comments and hyperlinks
-- [ ] .xlsm read support (preserve macros)
-- [ ] Sheet protection
-- [ ] Structured tables with styles
+- [x] Data validation (7 types with input/error messages)
+- [x] Comments and hyperlinks
+- [x] .xlsm read support (macros gracefully ignored)
+- [x] Sheet protection (with optional password and 15+ permission flags)
+- [x] Structured tables with styles
 - [x] Multiple sheet states (hidden, veryHidden)
+- [x] Document and custom properties
+- [x] NumPy type support
+- [x] Security hardening (XML bomb prevention, zip limits)
 
 ### Phase 3 — Rich content and ecosystem
 
 - [ ] Charts (bar, line, pie, scatter — most common types)
 - [ ] Image embedding (PNG, JPEG)
 - [ ] Conditional formatting
-- [ ] Document and custom properties
-- [ ] NumPy type support
 - [ ] Broader test corpus and fuzzing
-- [ ] Security hardening (XML attack prevention)
 
 ### Docs & community
 
@@ -521,7 +585,7 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 
 ## Project Status
 
-**v0.2.1** — streaming reader and writer with formula, date/time, merged cell, column width/row height, freeze pane, auto-filter, number format, cell styling, pandas DataFrame support, and AI/RAG extraction (markdown, text, chunks, LangChain, LlamaIndex). 221 passing tests and prebuilt wheels on PyPI. The API may change before 1.0.
+**v0.3.0** — all Phase 2 features complete: comments, hyperlinks, sheet protection, structured tables, data validation, document properties, .xlsm read support, NumPy types, and security hardening. 280+ passing tests. Streaming reader/writer with formulas, dates, merged cells, column widths/row heights, freeze panes, auto-filter, number formats, cell styling, named ranges, pandas DataFrames, and AI/RAG extraction. Prebuilt wheels on PyPI. The API may change before 1.0.
 
 ## Contributing
 
