@@ -578,10 +578,10 @@ We are not trying to clone openpyxl. We are building a **fast, safe, memory-effi
 
 ### Docs & community
 
-- [ ] Migration guide: openpyxl → opensheet-core (side-by-side code comparisons)
-- [ ] FastAPI/Flask streaming XLSX download examples
+- [x] Migration guide: openpyxl → opensheet-core (side-by-side code comparisons)
+- [x] FastAPI/Flask streaming XLSX download examples
 - [x] Benchmark methodology documentation
-- [ ] Dedicated benchmark page with chart visualizations
+- [x] Dedicated benchmark page with chart visualizations
 
 ## Project Status
 
