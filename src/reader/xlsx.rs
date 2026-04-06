@@ -9,8 +9,8 @@ use crate::types::{excel_serial_to_datetime, CellStyle, CellValue, Sheet};
 
 // ---------- Security limits ----------
 
-/// Maximum decompressed size of a single ZIP entry (256 MB).
-const MAX_ZIP_ENTRY_SIZE: u64 = 256 * 1024 * 1024;
+/// Maximum decompressed size of a single ZIP entry (16 GB).
+const MAX_ZIP_ENTRY_SIZE: u64 = 16 * 1024 * 1024 * 1024;
 
 /// Maximum number of shared strings allowed (2 million).
 const MAX_SHARED_STRINGS: usize = 2_000_000;
